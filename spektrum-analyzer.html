@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spektrumanalyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;500;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #080c14;
+    --bg2: #0d1322;
+    --bg3: #131a2e;
+    --border: rgba(80,160,255,0.12);
+    --border2: rgba(80,160,255,0.25);
+    --accent: #1a8fff;
+    --accent2: #00e5ff;
+    --text: #c8d8f0;
+    --text-dim: #5a7090;
+    --text-bright: #e8f4ff;
+    --danger: #ff4060;
+    --success: #00e080;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Barlow', sans-serif;
+  }
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* scanline effect */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.06) 2px,
+      rgba(0,0,0,0.06) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg2);
+  }
+
+  .logo {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .logo-title {
+    font-family: var(--mono);
+    font-size: 20px;
+    color: var(--accent2);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  .logo-sub {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-weight: 300;
+  }
+
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text-dim);
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 6px 14px;
+    letter-spacing: 1px;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: background 0.3s;
+    flex-shrink: 0;
+  }
+
+  .status-dot.live {
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+    animation: pulse 1.2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  main {
+    padding: 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* Controls */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .ctrl-block {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ctrl-block label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .ctrl-block select {
+    background: var(--bg3);
+    color: var(--text-bright);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    cursor: pointer;
+    outline: none;
+  }
+
+  .ctrl-block select:focus { border-color: var(--accent); }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 90px;
+    height: 3px;
+    background: var(--bg3);
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 6px var(--accent);
+  }
+
+  .range-val {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent2);
+    min-width: 40px;
+    text-align: right;
+  }
+
+  #startBtn {
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 10px 22px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  #startBtn:hover {
+    background: rgba(26,143,255,0.12);
+    box-shadow: 0 0 12px rgba(26,143,255,0.3);
+  }
+
+  #startBtn.active {
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+
+  #startBtn.active:hover {
+    background: rgba(255,64,96,0.12);
+    box-shadow: 0 0 12px rgba(255,64,96,0.3);
+  }
+
+  /* Canvas wrapper */
+  .canvas-wrap {
+    position: relative;
+    width: 100%;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  #specCanvas {
+    display: block;
+    width: 100%;
+    height: 340px;
+  }
+
+  /* Pegel-Balken */
+  .pegel-wrap {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .pegel-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    white-space: nowrap;
+    width: 80px;
+  }
+
+  .pegel-track {
+    flex: 1;
+    height: 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+
+  .pegel-bar {
+    height: 100%;
+    width: 0%;
+    border-radius: 5px;
+    transition: width 0.05s;
+    background: linear-gradient(to right, #00e080 0%, #f0c030 60%, #ff4060 100%);
+  }
+
+  /* Metrics */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+  }
+
+  .metric-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    opacity: 0.6;
+  }
+
+  .metric-name {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-weight: 300;
+    margin-bottom: 6px;
+  }
+
+  .metric-val {
+    font-family: var(--mono);
+    font-size: 22px;
+    color: var(--accent2);
+    line-height: 1;
+  }
+
+  .metric-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+  }
+
+  /* Frequenzkarte */
+  .freq-bands {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .band-pill {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    transition: all 0.2s;
+  }
+
+  .band-pill.active {
+    background: rgba(26,143,255,0.15);
+    border-color: var(--accent);
+    color: var(--accent2);
+    box-shadow: 0 0 8px rgba(26,143,255,0.2);
+  }
+
+  footer {
+    text-align: center;
+    padding: 16px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 600px) {
+    header { padding: 14px 16px; }
+    main { padding: 16px; gap: 14px; }
+    .logo-title { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-title">SPECTRA</span>
+    <span class="logo-sub">Analyzer v1.0</span>
+  </div>
+  <div class="status-pill">
+    <div class="status-dot" id="dot"></div>
+    <span id="statusText">BEREIT</span>
+  </div>
+</header>
+
+<main>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button id="startBtn">▶ Mikrofon starten</button>
+
+    <div class="ctrl-block">
+      <label>FFT-Größe</label>
+      <select id="fftSize">
+        <option value="512">512</option>
+        <option value="1024">1024</option>
+        <option value="2048" selected>2048</option>
+        <option value="4096">4096</option>
+      </select>
+    </div>
+
+    <div class="ctrl-block">
+      <label>Glättung</label>
+      <input type="range" id="smooth" min="0" max="95" step="5" value="75">
+      <span class="range-val" id="smoothVal">0.75</span>
+    </div>
+
+    <div class="ctrl-block">
+      <label>dB min</label>
+      <input type="range" id="dbMin" min="-120" max="-40" step="5" value="-90">
+      <span class="range-val" id="dbMinVal">-90</span>
+    </div>
+
+    <div class="ctrl-block">
+      <label>Helligkeit</label>
+      <input type="range" id="brightness" min="40" max="100" step="5" value="70">
+      <span class="range-val" id="brightnessVal">70%</span>
+    </div>
+  </div>
+
+  <!-- Canvas -->
+  <div class="canvas-wrap">
+    <canvas id="specCanvas"></canvas>
+  </div>
+
+  <!-- Pegelbalken -->
+  <div class="pegel-wrap">
+    <span class="pegel-label">Pegel</span>
+    <div class="pegel-track">
+      <div class="pegel-bar" id="pegelBar"></div>
+    </div>
+    <span class="range-val" id="pegelNum">— dB</span>
+  </div>
+
+  <!-- Metriken -->
+  <div class="metrics">
+    <div class="metric-card">
+      <div class="metric-name">Spitzenpegel</div>
+      <div class="metric-val" id="metPeak">—</div>
+      <div class="metric-sub">dBFS</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-name">Peak-Frequenz</div>
+      <div class="metric-val" id="metFreq">—</div>
+      <div class="metric-sub" id="metFreqSub">Hz</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-name">Frequenzband</div>
+      <div class="metric-val" style="font-size:15px;padding-top:4px;" id="metBand">—</div>
+      <div class="metric-sub" id="metBandRange">—</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-name">RMS-Pegel</div>
+      <div class="metric-val" id="metRms">—</div>
+      <div class="metric-sub">dBFS</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-name">Samplerate</div>
+      <div class="metric-val" id="metSr">—</div>
+      <div class="metric-sub">Hz</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-name">FFT-Auflösung</div>
+      <div class="metric-val" id="metRes">—</div>
+      <div class="metric-sub">Hz / Bin</div>
+    </div>
+  </div>
+
+  <!-- Frequenzbänder -->
+  <div class="freq-bands" id="freqBands">
+    <div class="band-pill" data-min="20" data-max="60">Sub-Bass</div>
+    <div class="band-pill" data-min="60" data-max="250">Bass</div>
+    <div class="band-pill" data-min="250" data-max="500">Untere Mitten</div>
+    <div class="band-pill" data-min="500" data-max="2000">Mitten</div>
+    <div class="band-pill" data-min="2000" data-max="4000">Obere Mitten</div>
+    <div class="band-pill" data-min="4000" data-max="8000">Präsenz</div>
+    <div class="band-pill" data-min="8000" data-max="20000">Brillanz</div>
+  </div>
+
+</main>
+
+<footer>SPECTRA ANALYZER — Web Audio API — Keine Daten werden gespeichert oder übertragen</footer>
+
+<script>
+const btn = document.getElementById('startBtn');
+const dot = document.getElementById('dot');
+const statusText = document.getElementById('statusText');
+const canvas = document.getElementById('specCanvas');
+const ctx2d = canvas.getContext('2d');
+const fftSel = document.getElementById('fftSize');
+const smoothEl = document.getElementById('smooth');
+const smoothValEl = document.getElementById('smoothVal');
+const dbMinEl = document.getElementById('dbMin');
+const dbMinValEl = document.getElementById('dbMinVal');
+const brightnessEl = document.getElementById('brightness');
+const brightnessValEl = document.getElementById('brightnessVal');
+const metPeak = document.getElementById('metPeak');
+const metFreq = document.getElementById('metFreq');
+const metFreqSub = document.getElementById('metFreqSub');
+const metBand = document.getElementById('metBand');
+const metBandRange = document.getElementById('metBandRange');
+const metRms = document.getElementById('metRms');
+const metSr = document.getElementById('metSr');
+const metRes = document.getElementById('metRes');
+const pegelBar = document.getElementById('pegelBar');
+const pegelNum = document.getElementById('pegelNum');
+const pills = document.querySelectorAll('.band-pill');
+
+let audioCtx, analyser, source, stream, rafId, running = false;
+
+const bands = [
+  { name: 'Sub-Bass',       min: 20,   max: 60,    range: '20–60 Hz' },
+  { name: 'Bass',           min: 60,   max: 250,   range: '60–250 Hz' },
+  { name: 'Untere Mitten',  min: 250,  max: 500,   range: '250–500 Hz' },
+  { name: 'Mitten',         min: 500,  max: 2000,  range: '500–2000 Hz' },
+  { name: 'Obere Mitten',   min: 2000, max: 4000,  range: '2–4 kHz' },
+  { name: 'Präsenz',        min: 4000, max: 8000,  range: '4–8 kHz' },
+  { name: 'Brillanz',       min: 8000, max: 20000, range: '8–20 kHz' },
+];
+
+function getBand(hz) {
+  for (const b of bands) if (hz >= b.min && hz < b.max) return b;
+  return { name: '—', range: '—' };
+}
+
+function formatHz(hz) {
+  if (hz >= 1000) return (hz / 1000).toFixed(hz >= 10000 ? 0 : 1);
+  return Math.round(hz).toString();
+}
+function hzUnit(hz) { return hz >= 1000 ? 'kHz' : 'Hz'; }
+
+function resizeCanvas() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  canvas.width = Math.floor(rect.width);
+  canvas.height = 340;
+}
+
+function barColor(t, brightness) {
+  const h = 190 + t * 150;
+  const l = (35 + t * 20) * (brightness / 70);
+  return `hsl(${h},85%,${Math.min(l, 70)}%)`;
+}
+
+function draw() {
+  if (!running) return;
+  rafId = requestAnimationFrame(draw);
+
+  const bufLen = analyser.frequencyBinCount;
+  const data = new Float32Array(bufLen);
+  analyser.getFloatFrequencyData(data);
+
+  const W = canvas.width, H = canvas.height;
+  const dbMinVal = parseInt(dbMinEl.value);
+  const brightness = parseInt(brightnessEl.value);
+  const sampleRate = audioCtx.sampleRate;
+  const binHz = sampleRate / analyser.fftSize;
+
+  ctx2d.clearRect(0, 0, W, H);
+  ctx2d.fillStyle = '#080c14';
+  ctx2d.fillRect(0, 0, W, H);
+
+  // Grid lines horizontal (dB)
+  for (let db = dbMinVal; db <= 0; db += 20) {
+    const y = H - ((db - dbMinVal) / (0 - dbMinVal)) * H;
+    ctx2d.strokeStyle = 'rgba(80,160,255,0.07)';
+    ctx2d.lineWidth = 1;
+    ctx2d.beginPath(); ctx2d.moveTo(0, y); ctx2d.lineTo(W, y); ctx2d.stroke();
+    ctx2d.fillStyle = 'rgba(120,180,255,0.35)';
+    ctx2d.font = '10px "Share Tech Mono", monospace';
+    ctx2d.fillText(db + 'dB', 5, y - 3);
+  }
+
+  // Frequency grid
+  const freqMarks = [50, 100, 200, 500, 1000, 2000, 5000, 10000, 16000, 20000];
+  ctx2d.font = '10px "Share Tech Mono", monospace';
+  for (const f of freqMarks) {
+    const bin = f / binHz;
+    if (bin >= bufLen) continue;
+    const x = (bin / bufLen) * W;
+    ctx2d.strokeStyle = 'rgba(80,160,255,0.08)';
+    ctx2d.lineWidth = 1;
+    ctx2d.beginPath(); ctx2d.moveTo(x, 0); ctx2d.lineTo(x, H - 18); ctx2d.stroke();
+    ctx2d.fillStyle = 'rgba(120,180,255,0.4)';
+    ctx2d.fillText(formatHz(f) + (f >= 1000 ? 'k' : ''), x + 2, H - 4);
+  }
+
+  // Bars
+  const numBars = Math.min(bufLen, Math.floor(W / 2));
+  const barW = W / numBars;
+  let peakDb = -Infinity, peakBin = 0;
+  let sumPow = 0, validCount = 0;
+
+  for (let i = 0; i < numBars; i++) {
+    const srcIdx = Math.floor(i * bufLen / numBars);
+    const db = data[srcIdx];
+    const norm = Math.max(0, (db - dbMinVal) / (0 - dbMinVal));
+    const barH = norm * (H - 20);
+    const x = i * barW;
+    const y = H - 20 - barH;
+    const t = i / numBars;
+
+    // Glow base
+    if (norm > 0.02) {
+      ctx2d.fillStyle = `hsla(${190 + t * 150},85%,${Math.min((35 + t * 20) * (brightness / 70), 70)}%,0.15)`;
+      ctx2d.fillRect(x, H - 20, barW, -(barH * 0.3));
+    }
+
+    ctx2d.fillStyle = barColor(t, brightness);
+    ctx2d.fillRect(x + 0.5, y, Math.max(0.5, barW - 1), barH);
+
+    if (db > peakDb) { peakDb = db; peakBin = srcIdx; }
+    if (isFinite(db) && db > dbMinVal) {
+      sumPow += Math.pow(10, db / 10);
+      validCount++;
+    }
+  }
+
+  const peakHz = peakBin * binHz;
+  const rmsDb = validCount > 0 ? 10 * Math.log10(sumPow / validCount) : -Infinity;
+  const normPeak = Math.max(0, Math.min(100, ((peakDb - dbMinVal) / (0 - dbMinVal)) * 100));
+
+  // Metrics
+  metPeak.textContent = isFinite(peakDb) ? peakDb.toFixed(1) : '—';
+  metFreq.textContent = isFinite(peakDb) ? formatHz(peakHz) : '—';
+  metFreqSub.textContent = hzUnit(peakHz);
+  const b = getBand(peakHz);
+  metBand.textContent = isFinite(peakDb) ? b.name : '—';
+  metBandRange.textContent = isFinite(peakDb) ? b.range : '—';
+  metRms.textContent = isFinite(rmsDb) ? rmsDb.toFixed(1) : '—';
+  pegelBar.style.width = normPeak.toFixed(1) + '%';
+  pegelNum.textContent = isFinite(peakDb) ? peakDb.toFixed(1) + ' dB' : '— dB';
+
+  // Band pills
+  pills.forEach(p => {
+    const min = parseInt(p.dataset.min), max = parseInt(p.dataset.max);
+    p.classList.toggle('active', isFinite(peakHz) && peakHz >= min && peakHz < max);
+  });
+}
+
+async function start() {
+  resizeCanvas();
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false });
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = parseInt(fftSel.value);
+    analyser.smoothingTimeConstant = smoothEl.value / 100;
+    analyser.minDecibels = -120;
+    analyser.maxDecibels = 0;
+    source = audioCtx.createMediaStreamSource(stream);
+    source.connect(analyser);
+    running = true;
+
+    metSr.textContent = audioCtx.sampleRate.toLocaleString('de');
+    metRes.textContent = (audioCtx.sampleRate / analyser.fftSize).toFixed(1);
+
+    btn.textContent = '■ Stoppen';
+    btn.classList.add('active');
+    dot.classList.add('live');
+    statusText.textContent = 'LIVE';
+    draw();
+  } catch (e) {
+    statusText.textContent = 'FEHLER';
+    console.error(e);
+  }
+}
+
+function stop() {
+  running = false;
+  cancelAnimationFrame(rafId);
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  if (audioCtx) audioCtx.close();
+  btn.textContent = '▶ Mikrofon starten';
+  btn.classList.remove('active');
+  dot.classList.remove('live');
+  statusText.textContent = 'BEREIT';
+  ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+  pegelBar.style.width = '0%';
+  pegelNum.textContent = '— dB';
+  metPeak.textContent = '—'; metFreq.textContent = '—';
+  metFreqSub.textContent = 'Hz'; metBand.textContent = '—';
+  metBandRange.textContent = '—'; metRms.textContent = '—';
+  metSr.textContent = '—'; metRes.textContent = '—';
+  pills.forEach(p => p.classList.remove('active'));
+}
+
+btn.addEventListener('click', () => running ? stop() : start());
+
+fftSel.addEventListener('change', () => {
+  if (running && analyser) {
+    analyser.fftSize = parseInt(fftSel.value);
+    metRes.textContent = (audioCtx.sampleRate / analyser.fftSize).toFixed(1);
+  }
+});
+
+smoothEl.addEventListener('input', () => {
+  const v = smoothEl.value / 100;
+  smoothValEl.textContent = v.toFixed(2);
+  if (analyser) analyser.smoothingTimeConstant = v;
+});
+
+dbMinEl.addEventListener('input', () => { dbMinValEl.textContent = dbMinEl.value; });
+brightnessEl.addEventListener('input', () => { brightnessValEl.textContent = brightnessEl.value + '%'; });
+
+window.addEventListener('resize', () => { resizeCanvas(); });
+resizeCanvas();
+</script>
+</body>
+</html>
